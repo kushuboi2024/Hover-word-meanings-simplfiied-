@@ -1,4 +1,4 @@
-# hover.
+# cipher.
 A tool to instantly look up word meanings by hovering over text.
 
 ## How to use
@@ -7,7 +7,7 @@ A tool to instantly look up word meanings by hovering over text.
 3. Hover over any word to see its definition
 
 ## Features
-- Hover any word for its definition, pronunciation, and example sentence
+- Click any word for its definition, pronunciation, and example sentence
 - Edit text live on the left while reading on the right
 - Upload PDF files — text is extracted automatically
 - Words you've looked up turn green
