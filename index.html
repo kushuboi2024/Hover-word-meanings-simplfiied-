@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hover — Word Meaning Tool</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Serif+4:wght@300;400;600&family=IBM+Plex+Mono:wght@300;400&family=Nunito:wght@300;400;600&display=swap" rel="stylesheet"/>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:             #F7F4EE;
+      --paper:          #FFFDF8;
+      --ink:            #1A1814;
+      --ink-light:      #6B6559;
+      --accent:         #C8502A;
+      --accent-bg:      #F5E6C8;
+      --looked-up:      #D4EDDA;
+      --looked-up-text: #2A6B3A;
+      --border:         #E2DDD5;
+      --shadow:         rgba(26,24,20,0.08);
+      --tooltip-bg:     #1A1814;
+      --tooltip-ink:    #fff;
+      --reader-size:    16px;
+    }
+
+    [data-theme="dark"] {
+      --bg:             #1A1814;
+      --paper:          #221F1A;
+      --ink:            #EDE8DF;
+      --ink-light:      #9E9589;
+      --accent:         #E8845A;
+      --accent-bg:      #3A2518;
+      --looked-up:      #1A3322;
+      --looked-up-text: #7FC99A;
+      --border:         #332E27;
+      --shadow:         rgba(0,0,0,0.3);
+      --tooltip-bg:     #EDE8DF;
+      --tooltip-ink:    #1A1814;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      transition: background 0.25s, color 0.25s;
+    }
+
+    /* ── HEADER ── */
+    header {
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: var(--paper);
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      gap: 1rem;
+      transition: background 0.25s, border-color 0.25s;
+    }
+    .header-left  { display: flex; align-items: baseline; gap: 0.75rem; flex-shrink: 0; }
+    .header-right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; justify-content: flex-end; }
+    .logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.7rem; font-weight: 700;
+      color: var(--ink); letter-spacing: -0.03em;
+    }
+    .logo span { color: var(--accent); }
+    .tagline { font-size: 0.78rem; color: var(--ink-light); font-weight: 300; letter-spacing: 0.05em; text-transform: uppercase; }
+    .looked-up-count {
+      font-size: 0.78rem; color: var(--looked-up-text);
+      background: var(--looked-up); border-radius: 20px;
+      padding: 0.25rem 0.8rem; font-weight: 500; display: none;
+    }
+    .settings-btn {
+      background: transparent; border: 1.5px solid var(--border);
+      border-radius: 8px; padding: 0.35rem 0.7rem;
+      font-size: 1rem; cursor: pointer; color: var(--ink-light);
+      transition: background 0.15s, border-color 0.15s; line-height: 1;
+    }
+    .settings-btn:hover { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+    .theme-toggle {
+      display: flex; align-items: center; gap: 0.4rem;
+      background: var(--bg); border: 1.5px solid var(--border);
+      border-radius: 20px; padding: 0.3rem 0.75rem;
+      cursor: pointer; font-size: 0.78rem;
+      font-family: 'DM Sans', sans-serif; font-weight: 500;
+      color: var(--ink-light); transition: all 0.2s; white-space: nowrap;
+    }
+    .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── SETTINGS PANEL ── */
+    .settings-panel {
+      position: fixed; top: 70px; right: 1.5rem;
+      background: var(--paper); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.2rem 1.4rem;
+      box-shadow: 0 8px 32px var(--shadow);
+      z-index: 500; min-width: 240px;
+      display: none; flex-direction: column; gap: 1.1rem;
+      transition: background 0.25s;
+    }
+    .settings-panel.open { display: flex; }
+    .setting-row { display: flex; flex-direction: column; gap: 0.4rem; }
+    .setting-label { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-light); }
+    .font-options  { display: flex; flex-direction: column; gap: 0.3rem; }
+    .font-option {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.5rem 0.7rem; border-radius: 7px; cursor: pointer;
+      border: 1.5px solid transparent; transition: background 0.15s, border-color 0.15s;
+    }
+    .font-option:hover  { background: var(--accent-bg); }
+    .font-option.active { border-color: var(--accent); background: var(--accent-bg); }
+    .font-option .preview { font-size: 1rem; color: var(--ink); flex: 1; }
+    .font-option .fname   { font-size: 0.72rem; color: var(--ink-light); white-space: nowrap; }
+    .size-row { display: flex; align-items: center; gap: 0.75rem; }
+    .size-row input[type="range"] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+    .size-value { font-size: 0.8rem; font-weight: 500; color: var(--ink); min-width: 32px; text-align: right; }
+
+    /* ── LANDING ── */
+    #landing {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; padding: 3rem 2rem;
+      gap: 2rem; max-width: 760px; margin: 0 auto; width: 100%;
+    }
+    .intro { text-align: center; }
+    .intro h1 { font-family: 'Playfair Display', serif; font-size: 2.2rem; font-weight: 400; line-height: 1.2; margin-bottom: 0.6rem; }
+    .intro p   { color: var(--ink-light); font-size: 1rem; font-weight: 300; }
+    .card {
+      background: var(--paper); border: 1px solid var(--border);
+      border-radius: 12px; padding: 2rem; width: 100%;
+      box-shadow: 0 2px 16px var(--shadow); transition: background 0.25s, border-color 0.25s;
+    }
+    .card label { display: block; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-light); margin-bottom: 0.75rem; }
+    textarea {
+      width: 100%; min-height: 220px; border: 1.5px solid var(--border);
+      border-radius: 8px; padding: 1rem 1.2rem;
+      font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 300;
+      color: var(--ink); background: var(--bg); resize: vertical; outline: none;
+      transition: border-color 0.2s, background 0.25s, color 0.25s; line-height: 1.7;
+    }
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--ink-light); opacity: 0.5; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: var(--accent); color: #fff; border: none;
+      border-radius: 8px; padding: 0.75rem 1.8rem;
+      font-family: 'DM Sans', sans-serif; font-size: 0.95rem;
+      font-weight: 500; cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:hover  { opacity: 0.88; }
+    .btn:active { transform: scale(0.98); }
+    .btn-ghost {
+      background: transparent; color: var(--ink-light); border: 1.5px solid var(--border);
+    }
+    .btn-ghost:hover { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); opacity: 1; }
+    .btn-icon {
+      background: transparent; color: var(--ink-light);
+      border: 1.5px solid var(--border); padding: 0.4rem 0.85rem;
+      font-size: 0.88rem; font-family: 'DM Sans', sans-serif; font-weight: 500;
+      border-radius: 8px; cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .btn-icon:hover    { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+    .btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .or-divider { display: flex; align-items: center; gap: 1rem; width: 100%; color: var(--ink-light); font-size: 0.82rem; }
+    .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ── PDF ZONE ── */
+    .pdf-zone {
+      width: 100%; border: 2px dashed var(--border);
+      border-radius: 12px; padding: 2rem; text-align: center;
+      cursor: pointer; transition: border-color 0.2s, background 0.2s;
+      background: var(--paper); position: relative;
+    }
+    .pdf-zone:hover, .pdf-zone.drag-over { border-color: var(--accent); background: var(--accent-bg); }
+    .pdf-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .pdf-icon  { font-size: 2rem; margin-bottom: 0.5rem; }
+    .pdf-label { font-size: 0.95rem; font-weight: 500; color: var(--ink); margin-bottom: 0.25rem; }
+    .pdf-sub   { font-size: 0.8rem; color: var(--ink-light); font-weight: 300; }
+    .pdf-loading { font-size: 0.88rem; color: var(--accent); font-style: italic; margin-top: 0.75rem; display: none; }
+
+    /* ── SPLIT VIEW ── */
+    #splitView { display: none; flex: 1; overflow: hidden; }
+    .split-container { display: grid; grid-template-columns: 1fr 1fr; height: calc(100vh - 65px); }
+    .panel-editor {
+      border-right: 1px solid var(--border); display: flex;
+      flex-direction: column; background: var(--paper);
+      transition: background 0.25s, border-color 0.25s;
+    }
+    .panel-header {
+      padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg); gap: 0.5rem;
+      transition: background 0.25s, border-color 0.25s;
+    }
+    .panel-title { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-light); }
+    .panel-editor textarea { flex: 1; border: none; border-radius: 0; background: var(--paper); padding: 1.5rem; resize: none; min-height: unset; font-size: 0.95rem; line-height: 1.8; }
+    .panel-editor textarea:focus { border-color: transparent; }
+    .panel-reader { display: flex; flex-direction: column; background: var(--paper); overflow: hidden; transition: background 0.25s; }
+
+    /* ── PDF VIEW ── */
+    #pdfView { display: none; flex: 1; flex-direction: column; overflow: hidden; background: var(--paper); transition: background 0.25s; }
+    .pdf-nav-bar {
+      padding: 0.65rem 2rem; border-bottom: 1px solid var(--border);
+      background: var(--bg); display: flex; align-items: center;
+      gap: 1rem; flex-wrap: wrap;
+      transition: background 0.25s, border-color 0.25s;
+    }
+    .pdf-filename { font-size: 0.8rem; color: var(--accent); background: var(--accent-bg); border-radius: 20px; padding: 0.22rem 0.8rem; font-weight: 500; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .page-nav { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
+    .page-nav-label { font-size: 0.78rem; color: var(--ink-light); white-space: nowrap; }
+    .page-input-wrap { display: flex; align-items: center; gap: 0.4rem; background: var(--paper); border: 1.5px solid var(--border); border-radius: 8px; padding: 0.22rem 0.5rem; transition: background 0.25s, border-color 0.25s; }
+    .page-input-wrap input { width: 44px; border: none; outline: none; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; font-weight: 500; text-align: center; background: transparent; color: var(--ink); }
+    .page-input-wrap span { font-size: 0.8rem; color: var(--ink-light); }
+    .go-btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 0.28rem 0.65rem; font-size: 0.8rem; font-family: 'DM Sans', sans-serif; font-weight: 500; cursor: pointer; transition: opacity 0.15s; }
+    .go-btn:hover { opacity: 0.85; }
+    #pdfReaderContent { flex: 1; overflow-y: auto; padding: 3rem; max-width: 780px; margin: 0 auto; width: 100%; }
+    .page-turn-footer { display: flex; align-items: center; justify-content: center; gap: 1.5rem; padding: 0.85rem 2rem; border-top: 1px solid var(--border); background: var(--bg); transition: background 0.25s, border-color 0.25s; }
+    .page-turn-footer .page-info { font-size: 0.82rem; color: var(--ink-light); min-width: 90px; text-align: center; }
+
+    /* ── READER TYPOGRAPHY ── */
+    .reader-area { flex: 1; overflow-y: auto; padding: 1.5rem; line-height: 1.9; font-size: var(--reader-size); font-weight: 300; }
+    .pdf-paragraph { margin-bottom: 1.3em; line-height: 1.9; font-size: var(--reader-size); font-weight: 300; transition: font-size 0.15s; }
+    .pdf-heading   { font-family: 'Playfair Display', serif; font-size: calc(var(--reader-size) * 1.18); font-weight: 700; margin-top: 1.8em; margin-bottom: 0.5em; color: var(--ink); transition: font-size 0.15s; }
+    .page-label    { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-light); margin-bottom: 1.8rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+
+    /* ── WORD SPANS ── */
+    .word { display: inline; cursor: pointer; border-radius: 3px; padding: 1px 3px; transition: background 0.15s, color 0.15s; }
+    .word:hover      { background: var(--accent-bg); color: var(--accent); }
+    .word.looked-up  { background: var(--looked-up); color: var(--looked-up-text); }
+    .word.looked-up:hover { filter: brightness(0.92); }
+
+    /* ── FLOATING TOOLTIP ── */
+    #floatingTooltip {
+      position: fixed; background: var(--tooltip-bg); color: var(--tooltip-ink);
+      font-size: 0.82rem; padding: 0.9rem 1.1rem; border-radius: 10px;
+      pointer-events: none; opacity: 0; transition: opacity 0.15s, background 0.25s;
+      z-index: 9999; min-width: 200px; max-width: 300px;
+      white-space: normal; text-align: left; line-height: 1.5;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    #floatingTooltip .arrow { position: absolute; left: 50%; transform: translateX(-50%); border: 6px solid transparent; }
+    #floatingTooltip.arrow-down .arrow { top: 100%;    border-top-color:    var(--tooltip-bg); }
+    #floatingTooltip.arrow-up   .arrow { bottom: 100%; border-bottom-color: var(--tooltip-bg); }
+    .tooltip-word     { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1rem; margin-bottom: 3px; }
+    .tooltip-phonetic { font-size: 0.72rem; opacity: 0.55; margin-bottom: 4px; font-style: italic; }
+    .tooltip-type     { font-size: 0.7rem; color: #C8A882; font-style: italic; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .tooltip-def      { font-size: 0.82rem; opacity: 0.85; line-height: 1.55; margin-bottom: 5px; }
+    .tooltip-example  { font-size: 0.76rem; opacity: 0.55; font-style: italic; border-top: 1px solid rgba(128,128,128,0.3); padding-top: 6px; margin-top: 4px; }
+    .tooltip-loading  { font-size: 0.8rem; opacity: 0.55; font-style: italic; }
+    .tooltip-error    { font-size: 0.8rem; color: #E8957A; font-style: italic; }
+
+    /* ── EMPTY STATE ── */
+    .empty-reader { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 0.5rem; color: var(--ink-light); text-align: center; padding: 2rem; }
+    .empty-reader .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .empty-reader p { font-size: 0.9rem; font-weight: 300; }
+
+    footer { text-align: center; padding: 1rem; font-size: 0.75rem; color: var(--ink-light); border-top: 1px solid var(--border); background: var(--paper); transition: background 0.25s, border-color 0.25s; }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div class="header-left">
+      <div class="logo">hover<span>.</span></div>
+      <div class="tagline">Instant word meanings</div>
+    </div>
+    <div class="header-right">
+      <span class="looked-up-count" id="lookedUpCount"></span>
+      <button class="settings-btn" onclick="toggleSettings()" title="Font settings">⚙️</button>
+      <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">
+        <span id="themeIcon">🌙</span>
+        <span id="themeLabel">Dark</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Settings panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <div class="setting-row">
+      <div class="setting-label">Font family</div>
+      <div class="font-options">
+        <div class="font-option active" data-font="'DM Sans', sans-serif" onclick="setFont(this)">
+          <span class="preview" style="font-family:'DM Sans',sans-serif">The quick brown fox</span>
+          <span class="fname">DM Sans</span>
+        </div>
+        <div class="font-option" data-font="'Lora', serif" onclick="setFont(this)">
+          <span class="preview" style="font-family:'Lora',serif">The quick brown fox</span>
+          <span class="fname">Lora</span>
+        </div>
+        <div class="font-option" data-font="'Source Serif 4', serif" onclick="setFont(this)">
+          <span class="preview" style="font-family:'Source Serif 4',serif">The quick brown fox</span>
+          <span class="fname">Source Serif</span>
+        </div>
+        <div class="font-option" data-font="'Nunito', sans-serif" onclick="setFont(this)">
+          <span class="preview" style="font-family:'Nunito',sans-serif">The quick brown fox</span>
+          <span class="fname">Nunito</span>
+        </div>
+        <div class="font-option" data-font="'IBM Plex Mono', monospace" onclick="setFont(this)">
+          <span class="preview" style="font-family:'IBM Plex Mono',monospace">The quick brown fox</span>
+          <span class="fname">Mono</span>
+        </div>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">Font size</div>
+      <div class="size-row">
+        <span style="font-size:0.75rem;color:var(--ink-light)">A</span>
+        <input type="range" min="12" max="22" value="16" id="fontSizeSlider" oninput="setFontSize(this.value)" />
+        <span style="font-size:1.1rem;color:var(--ink-light)">A</span>
+        <span class="size-value" id="sizeLabel">16px</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- LANDING -->
+  <div id="landing">
+    <div class="intro">
+      <h1>Understand every word,<br/>without leaving the page.</h1>
+      <p>Paste any text or upload a PDF — hover any word to see its meaning.</p>
+    </div>
+    <div class="card">
+      <label for="userText">Paste your text here</label>
+      <textarea id="userText" placeholder="e.g. The philosopher posited an ephemeral theory about the cosmos and its perpetual metamorphosis…"></textarea>
+    </div>
+    <button class="btn" onclick="activateTextMode()">✨ Activate Hover Mode</button>
+    <div class="or-divider">or</div>
+    <div class="pdf-zone" id="pdfZone">
+      <input type="file" accept=".pdf" id="pdfInput" />
+      <div class="pdf-icon">📄</div>
+      <div class="pdf-label">Drop a PDF here, or click to browse</div>
+      <div class="pdf-sub">Navigate page by page with full formatting</div>
+      <div class="pdf-loading" id="pdfLoading">⏳ Reading PDF…</div>
+    </div>
+  </div>
+
+  <!-- SPLIT VIEW -->
+  <div id="splitView">
+    <div class="split-container">
+      <div class="panel-editor">
+        <div class="panel-header">
+          <span class="panel-title">✏️ Edit your text</span>
+          <div style="display:flex;gap:0.4rem">
+            <button class="btn-icon" onclick="syncReader()">↻ Refresh</button>
+            <button class="btn-icon" onclick="backToLanding()">← Back</button>
+          </div>
+        </div>
+        <textarea id="editText" spellcheck="false" oninput="autoSync()"></textarea>
+      </div>
+      <div class="panel-reader">
+        <div class="panel-header"><span class="panel-title">📖 Hover to read</span></div>
+        <div class="reader-area" id="readerContent">
+          <div class="empty-reader">
+            <div class="icon">👆</div>
+            <p>Start typing on the left<br/>to see words appear here.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PDF VIEW -->
+  <div id="pdfView">
+    <div class="pdf-nav-bar">
+      <span class="pdf-filename" id="pdfFilename"></span>
+      <div class="page-nav">
+        <span class="page-nav-label">Jump to:</span>
+        <div class="page-input-wrap">
+          <input type="number" id="pageJumpInput" min="1" value="1" onkeydown="if(event.key==='Enter') goToPage()" />
+          <span id="totalPagesLabel">/ ?</span>
+        </div>
+        <button class="go-btn" onclick="goToPage()">Go</button>
+        <button class="btn-icon" style="margin-left:0.4rem" onclick="backToLanding()">← Back</button>
+      </div>
+    </div>
+    <div id="pdfReaderContent"></div>
+    <div class="page-turn-footer">
+      <button class="btn-icon" id="prevBtn" onclick="changePage(-1)">← Prev</button>
+      <span class="page-info" id="pageInfo">Page 1</span>
+      <button class="btn-icon" id="nextBtn" onclick="changePage(1)">Next →</button>
+    </div>
+  </div>
+
+  <footer>hover. · Paste text or read PDFs page by page</footer>
+
+  <div id="floatingTooltip">
+    <div class="arrow"></div>
+    <div id="tooltipBody"></div>
+  </div>
+
+  <script>
+
+    // ── Common words: NOT highlighted or counted ──────────────────
+    const COMMON_WORDS = new Set([
+      'a','an','the','and','or','but','in','on','at','to','for','of','with',
+      'by','from','is','are','was','were','be','been','being','have','has',
+      'had','do','does','did','will','would','could','should','may','might',
+      'shall','can','not','no','nor','so','yet','both','either','neither',
+      'each','every','all','any','few','more','most','other','some','such',
+      'than','then','that','this','these','those','what','which','who','whom',
+      'whose','when','where','why','how','if','as','i','you','he','she','it',
+      'we','they','me','him','her','us','them','my','your','his','its','our',
+      'their','mine','yours','hers','ours','theirs','am','up','out','about',
+      'into','through','during','before','after','above','below','between',
+      'own','same','just','because','while','although','however','therefore',
+      'also','too','very','here','there','over','under','again','further',
+      'once','only','even','back','still','s','t','don','doesn','wasn','isn',
+      'aren','couldn','shouldn','wouldn','hadn','hasn','haven','many','much',
+      'like','well','said','get','got','one','two','three','new','first',
+      'last','long','great','little','right','big','high','old','re','ve',
+    ]);
+
+    // ── Shared state ──────────────────────────────────────────────
+    const definitionCache = {};
+    const lookedUpWords   = new Set();
+    let   syncTimer       = null;
+    let   activeWord      = null;
+
+    const floatingTip = document.getElementById('floatingTooltip');
+    const tooltipBody = document.getElementById('tooltipBody');
+    const TOOLTIP_GAP = 10;
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // ── Theme ─────────────────────────────────────────────────────
+    // Simple toggle — always starts light, no system detection
+    applyTheme('light');
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      document.getElementById('themeIcon').textContent  = theme === 'dark' ? '☀️' : '🌙';
+      document.getElementById('themeLabel').textContent = theme === 'dark' ? 'Light' : 'Dark';
+    }
+
+    function toggleTheme() {
+      const cur = document.documentElement.getAttribute('data-theme') || 'light';
+      applyTheme(cur === 'dark' ? 'light' : 'dark');
+    }
+
+    // ── Settings panel ────────────────────────────────────────────
+    function toggleSettings() {
+      document.getElementById('settingsPanel').classList.toggle('open');
+    }
+    document.addEventListener('click', e => {
+      const panel = document.getElementById('settingsPanel');
+      const btn   = document.querySelector('.settings-btn');
+      if (!panel.contains(e.target) && !btn.contains(e.target))
+        panel.classList.remove('open');
+    });
+
+    // ── Font family ───────────────────────────────────────────────
+    function setFont(el) {
+      const font = el.dataset.font;
+      // Apply to all reading areas
+      document.querySelectorAll(
+        '.pdf-paragraph,.reader-area,#readerContent,#pdfReaderContent,#editText,.panel-editor textarea'
+      ).forEach(node => node.style.fontFamily = font);
+      document.querySelectorAll('.font-option').forEach(o => o.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    // ── Font size ─────────────────────────────────────────────────
+    function setFontSize(val) {
+      document.getElementById('sizeLabel').textContent = val + 'px';
+      document.documentElement.style.setProperty('--reader-size', val + 'px');
+    }
+
+    // ── View switching ────────────────────────────────────────────
+    function showView(name) {
+      document.getElementById('landing').style.display   = name === 'landing' ? 'flex' : 'none';
+      document.getElementById('splitView').style.display = name === 'split'   ? 'flex' : 'none';
+      document.getElementById('pdfView').style.display   = name === 'pdf'     ? 'flex' : 'none';
+    }
+
+    function backToLanding() {
+      showView('landing');
+      hideTooltip();
+      lookedUpWords.clear();
+      updateCounter();
+      pdfPages = []; currentPage = 1;
+    }
+
+    // ── Text mode ─────────────────────────────────────────────────
+    function activateTextMode() {
+      const text = document.getElementById('userText').value.trim();
+      if (!text) { alert('Please paste some text first!'); return; }
+      document.getElementById('editText').value = text;
+      showView('split');
+      renderReader(text, 'readerContent');
+    }
+
+    function autoSync() {
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => {
+        const t = document.getElementById('editText').value.trim();
+        if (t) renderReader(t, 'readerContent');
+      }, 600);
+    }
+
+    function syncReader() {
+      const t = document.getElementById('editText').value.trim();
+      if (t) renderReader(t, 'readerContent');
+    }
+
+    // ── PDF mode ──────────────────────────────────────────────────
+    let pdfPages    = [];
+    let currentPage = 1;
+
+    document.getElementById('pdfInput').addEventListener('change', e => {
+      if (e.target.files[0]) handlePdfFile(e.target.files[0]);
+    });
+    const pdfZone = document.getElementById('pdfZone');
+    pdfZone.addEventListener('dragover',  e => { e.preventDefault(); pdfZone.classList.add('drag-over'); });
+    pdfZone.addEventListener('dragleave', () => pdfZone.classList.remove('drag-over'));
+    pdfZone.addEventListener('drop', e => {
+      e.preventDefault(); pdfZone.classList.remove('drag-over');
+      const f = e.dataTransfer.files[0];
+      if (f && f.type === 'application/pdf') handlePdfFile(f);
+      else alert('Please drop a PDF file.');
+    });
+
+    async function handlePdfFile(file) {
+      const loading = document.getElementById('pdfLoading');
+      loading.style.display = 'block';
+      try {
+        const buf    = await file.arrayBuffer();
+        const pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+        pdfPages     = [];
+        for (let n = 1; n <= pdfDoc.numPages; n++) {
+          const page     = await pdfDoc.getPage(n);
+          const content  = await page.getTextContent();
+          const viewport = page.getViewport({ scale: 1 });
+          pdfPages.push(extractStructuredText(content.items, viewport.height));
+        }
+        loading.style.display = 'none';
+        document.getElementById('pdfFilename').textContent     = `📄 ${file.name}`;
+        document.getElementById('totalPagesLabel').textContent = `/ ${pdfDoc.numPages}`;
+        document.getElementById('pageJumpInput').max           = pdfDoc.numPages;
+        currentPage = 1;
+        showView('pdf');
+        renderPdfPage(1);
+      } catch (err) {
+        loading.style.display = 'none';
+        alert('Could not read this PDF. Make sure it is a text-based (not scanned) PDF.');
+        console.error(err);
+      }
+    }
+
+    function extractStructuredText(items, pageHeight) {
+      if (!items.length) return [];
+      const mapped = items.map(item => ({
+        text: item.str,
+        x:    item.transform[4],
+        y:    pageHeight - item.transform[5],
+        size: Math.abs(item.transform[3]),
+        bold: (item.fontName || '').toLowerCase().includes('bold'),
+      }));
+
+      const lineGroups = [];
+      let cur = null;
+      mapped.forEach(item => {
+        if (!item.text.trim()) return;
+        if (!cur || Math.abs(item.y - cur.y) > 3) {
+          cur = { y: item.y, size: item.size, bold: item.bold, parts: [item.text] };
+          lineGroups.push(cur);
+        } else {
+          const prev = cur.parts[cur.parts.length - 1];
+          cur.parts.push(prev && !prev.endsWith(' ') && !item.text.startsWith(' ') ? ' ' + item.text : item.text);
+          if (item.size > cur.size) cur.size = item.size;
+          if (item.bold) cur.bold = true;
+        }
+      });
+
+      const freq = {};
+      lineGroups.forEach(l => { const s = Math.round(l.size); freq[s] = (freq[s]||0)+1; });
+      const bodySize = parseInt(Object.entries(freq).sort((a,b)=>b[1]-a[1])[0]?.[0] || 12);
+
+      const blocks = []; let buf = [];
+      const flush  = () => { if (buf.length) { blocks.push({ type:'paragraph', text: buf.join(' ') }); buf=[]; } };
+
+      lineGroups.forEach((line, i) => {
+        const text    = line.parts.join('').trim();
+        if (!text) return;
+        const short   = text.length < 80;
+        const heading = (line.size > bodySize+1.5 && short) || (line.bold && short) || (text===text.toUpperCase() && /[A-Z]/.test(text) && short);
+        if (heading) { flush(); blocks.push({ type:'heading', text }); return; }
+        buf.push(text);
+        const next = lineGroups[i+1];
+        if (next && (next.y - line.y) > line.size * 2.1) flush();
+      });
+      flush();
+      return blocks;
+    }
+
+    function renderPdfPage(pageNum) {
+      const container = document.getElementById('pdfReaderContent');
+      const blocks    = pdfPages[pageNum - 1];
+      const total     = pdfPages.length;
+      container.scrollTop = 0;
+      if (!blocks?.length) {
+        container.innerHTML = `<div style="color:var(--ink-light);font-style:italic;text-align:center;padding:3rem">No text found on this page.</div>`;
+      } else {
+        let html = `<div class="page-label">Page ${pageNum} of ${total}</div>`;
+        blocks.forEach(b => {
+          html += `<div class="${b.type==='heading'?'pdf-heading':'pdf-paragraph'}">${tokenizeToSpans(b.text)}</div>`;
+        });
+        container.innerHTML = html;
+        attachHoverListeners(container);
+      }
+      updatePageUI(pageNum, total);
+    }
+
+    function updatePageUI(p, t) {
+      document.getElementById('pageInfo').textContent  = `Page ${p} of ${t}`;
+      document.getElementById('pageJumpInput').value   = p;
+      document.getElementById('prevBtn').disabled      = p <= 1;
+      document.getElementById('nextBtn').disabled      = p >= t;
+    }
+
+    function changePage(d) {
+      const n = currentPage + d;
+      if (n < 1 || n > pdfPages.length) return;
+      currentPage = n; renderPdfPage(n);
+    }
+
+    function goToPage() {
+      const n = parseInt(document.getElementById('pageJumpInput').value);
+      if (!n || n < 1 || n > pdfPages.length) { alert(`Enter a page between 1 and ${pdfPages.length}.`); return; }
+      currentPage = n; renderPdfPage(n);
+    }
+
+    // ── Tokenizer ─────────────────────────────────────────────────
+    function tokenizeToSpans(raw) {
+      return raw.split(/(\s+)/).map(token => {
+        if (/\n/.test(token)) return ' ';
+        if (!/\S/.test(token)) return token;
+        const clean = token.replace(/^[^a-zA-Z']+|[^a-zA-Z']+$/g, '');
+        if (!clean) return token;
+        const lw  = clean.toLowerCase();
+        const cls = lookedUpWords.has(lw) ? ' looked-up' : '';
+        return `<span class="word${cls}" data-word="${lw}">${token}</span>`;
+      }).join('');
+    }
+
+    function renderReader(raw, id) {
+      const container = document.getElementById(id);
+      container.innerHTML = raw.split('\n').map(line => {
+        const t = line.trim();
+        return t ? `<div class="pdf-paragraph">${tokenizeToSpans(t)}</div>` : '<br/>';
+      }).join('');
+      attachHoverListeners(container);
+    }
+
+    // ── Hover listeners ───────────────────────────────────────────
+    function attachHoverListeners(container) {
+      container.querySelectorAll('.word').forEach(span => {
+        span.addEventListener('mouseenter', () => {
+          const word     = span.dataset.word;
+          const isCommon = COMMON_WORDS.has(word);
+          activeWord     = span;
+
+          // Only highlight & count non-common words
+          if (!isCommon && !lookedUpWords.has(word)) {
+            lookedUpWords.add(word);
+            // ── Only mark THIS exact span green, not every instance ──
+            span.classList.add('looked-up');
+            updateCounter();
+          }
+
+          tooltipBody.innerHTML = `<div class="tooltip-loading">Looking up…</div>`;
+          positionTooltip(span);
+          floatingTip.style.opacity = '1';
+          fetchDefinition(word, span);
+        });
+        span.addEventListener('mouseleave', () => { hideTooltip(); activeWord = null; });
+      });
+    }
+
+    // ── Tooltip positioning ───────────────────────────────────────
+    function positionTooltip(span) {
+      const r    = span.getBoundingClientRect();
+      const tipW = floatingTip.offsetWidth  || 260;
+      const tipH = floatingTip.offsetHeight || 120;
+      const goAbove = r.top >= tipH + TOOLTIP_GAP || r.top >= (window.innerHeight - r.bottom);
+      const top = goAbove ? r.top - tipH - TOOLTIP_GAP : r.bottom + TOOLTIP_GAP;
+      floatingTip.classList.toggle('arrow-down', goAbove);
+      floatingTip.classList.toggle('arrow-up',  !goAbove);
+      let left = (r.left + r.width/2) - tipW/2;
+      left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
+      floatingTip.style.top  = `${top}px`;
+      floatingTip.style.left = `${left}px`;
+    }
+
+    function hideTooltip() { floatingTip.style.opacity = '0'; }
+
+    // ── Dictionary API ────────────────────────────────────────────
+    async function fetchDefinition(word, span) {
+      if (definitionCache[word]) {
+        if (activeWord === span) { tooltipBody.innerHTML = definitionCache[word]; positionTooltip(span); }
+        return;
+      }
+      try {
+        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+        let html;
+        if (!res.ok) {
+          html = `<div class="tooltip-error">No definition found</div>`;
+        } else {
+          const data  = await res.json();
+          const entry = data[0];
+          const m     = entry.meanings[0];
+          const pos   = m?.partOfSpeech || '';
+          const def   = m?.definitions[0]?.definition || 'No definition available';
+          const ex    = m?.definitions[0]?.example || '';
+          const phon  = entry.phonetic || '';
+          html = `
+            <div class="tooltip-word">${entry.word}</div>
+            ${phon ? `<div class="tooltip-phonetic">${phon}</div>`  : ''}
+            ${pos  ? `<div class="tooltip-type">${pos}</div>`        : ''}
+            <div class="tooltip-def">${def.length>140?def.slice(0,137)+'…':def}</div>
+            ${ex   ? `<div class="tooltip-example">"${ex.length>100?ex.slice(0,97)+'…':ex}"</div>` : ''}
+          `;
+        }
+        definitionCache[word] = html;
+        if (activeWord === span) { tooltipBody.innerHTML = html; positionTooltip(span); }
+      } catch {
+        if (activeWord === span) tooltipBody.innerHTML = `<div class="tooltip-error">Couldn't connect</div>`;
+      }
+    }
+
+    // ── Counter ───────────────────────────────────────────────────
+    function updateCounter() {
+      const n  = lookedUpWords.size;
+      const el = document.getElementById('lookedUpCount');
+      el.style.display = n > 0 ? 'inline-block' : 'none';
+      el.textContent   = `${n} word${n!==1?'s':''} looked up`;
+    }
+
+  </script>
+</body>
+</html>
